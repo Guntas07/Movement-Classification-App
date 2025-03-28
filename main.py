@@ -1,4 +1,3 @@
-import pandas
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,6 +5,9 @@ import h5py
 import random
 from sklearn.model_selection import train_test_split
 
+# This file creates the HDF5 file required for the assignment. It also prints the graphs with the moving average
+
+# Load all the CSV's
 # Jumping data
 matt_jump_BP = pd.read_csv("Matt/Jumping_Back_Pocket.csv")
 matt_jump_FP = pd.read_csv("Matt/Jumping_Front_Pocket.csv")
@@ -31,6 +33,7 @@ ben_walk_FP = pd.read_csv("Ben/Walking Pocket.csv")
 
 guntas_walk_H = pd.read_csv("Guntas/Walking.csv")
 
+# Map each dataset's name to the dataset
 datasets = {
     "matt_jump_BP": matt_jump_BP,
     "matt_jump_FP": matt_jump_FP,
@@ -52,6 +55,7 @@ datasets = {
 }
 
 
+# Open the file and add the raw data to it
 with h5py.File('./hdf5_data.h5', 'w') as hdf:
     rawData = hdf.create_group('/Raw Data')
     matt_rawData = hdf.create_group('Raw Data/Matt')
@@ -77,16 +81,17 @@ with h5py.File('./hdf5_data.h5', 'w') as hdf:
     guntas_rawData.create_dataset('Jumping_BP', data=guntas_jump_BP)
     guntas_rawData.create_dataset('Walking_H', data=guntas_walk_H)
 
-    # Create groups in HDF file
+    # Create the other groups in HDF file
     preproc_group = hdf.create_group("/Preprocessed Data")
     train_test_group = hdf.create_group("/Train_Test Data")
     train_group = train_test_group.create_group("Train")
     test_group = train_test_group.create_group("Test")
 
+    # Go through each dataset to create the moving averages and store them
     for name, i in datasets.items():
         df = i
 
-        # Clean NA values
+        # Clean NA values in the dataset if they exist
         naIndex = np.where(df.isna())
         if len(naIndex[0]) != 0:
             df.interpolate(method="linear", inplace=True)
@@ -94,10 +99,10 @@ with h5py.File('./hdf5_data.h5', 'w') as hdf:
         # MA length
         window = 49
 
-        # Moving average
-        xAccMa100 = df['Acceleration x (m/s^2)'].rolling(window=window).mean()
-        yAccMa100 = df['Acceleration y (m/s^2)'].rolling(window=window).mean()
-        zAccMa100 = df['Acceleration z (m/s^2)'].rolling(window=window).mean()
+        # Create Moving average
+        xAccMa = df['Acceleration x (m/s^2)'].rolling(window=window).mean()
+        yAccMa = df['Acceleration y (m/s^2)'].rolling(window=window).mean()
+        zAccMa = df['Acceleration z (m/s^2)'].rolling(window=window).mean()
 
         # Save the moving averages into preprocessed group
         personName = name.split("_")[0].capitalize()
@@ -106,25 +111,25 @@ with h5py.File('./hdf5_data.h5', 'w') as hdf:
         else:
             grm = preproc_group.create_group(personName)
 
-        grm.create_dataset(f"xMA {name}", data=xAccMa100)
-        grm.create_dataset(f"yMA {name}", data=yAccMa100)
-        grm.create_dataset(f"zMA {name}", data=zAccMa100)
+        # Create a dataset with the corresponding data and MA
+        grm.create_dataset(f"xMA {name}", data=xAccMa)
+        grm.create_dataset(f"yMA {name}", data=yAccMa)
+        grm.create_dataset(f"zMA {name}", data=zAccMa)
 
         # Create and save segmented data
-        # Split data into 5 second segments
         # Get the time series values from the time dataframe
         time_Series = df["Time (s)"]
 
         # Calculate the differences between consecutive time values
         time_differences = time_Series.diff().dropna()  # .diff() gets the difference, .dropna() removes the first NaN
 
-        # Calculate the average time difference
+        # Calculate the average time difference between all the segments
         average_delta = time_differences.mean()
 
         # Calculate number of data entries in each 5-second window
         num_entries = int(5 / average_delta)
 
-        # Total number of 5-second windows
+        # Calculate total number of 5-second windows
         num_windows = len(df) // num_entries
 
         # Arrays to store windows for each column in the dataset
@@ -133,15 +138,15 @@ with h5py.File('./hdf5_data.h5', 'w') as hdf:
         y_windows = []
         z_windows = []
 
-        # Split the data into 5 second segments
+        # Split the data into 5 second segments by using math and the numbers calculated above
         for j in range(num_windows):
             start = j * num_entries
             end = start + num_entries
 
             time_windows.append(time_Series.iloc[start:end])
-            x_windows.append(xAccMa100.iloc[start:end])
-            y_windows.append(yAccMa100.iloc[start:end])
-            z_windows.append(zAccMa100.iloc[start:end])
+            x_windows.append(xAccMa.iloc[start:end])
+            y_windows.append(yAccMa.iloc[start:end])
+            z_windows.append(zAccMa.iloc[start:end])
 
         # Shuffle all the lists, keeping the shuffle consistent among the different axis
         combined = list(zip(time_windows, x_windows, y_windows, z_windows))
@@ -183,12 +188,12 @@ with h5py.File('./hdf5_data.h5', 'w') as hdf:
         test_subgroup.create_dataset("z", data=z_test)
         test_subgroup.create_dataset("label", data=labels_test)
 
-        # Plot MA's
-        '''
+        # Plot MA's (This plots so many graphs that an error occurs due to too many requests from the API
+        # That's why the Y and Z are commented out, you can uncomment them to check the data
         # X plot
         plt.figure(figsize=(10, 6))
         plt.plot(df['Time (s)'], df['Acceleration x (m/s^2)'], label='Original X Acceleration', color='blue')
-        plt.plot(df['Time (s)'], xAccMa100, label='Moving Average', color='red', linewidth=2)
+        plt.plot(df['Time (s)'], xAccMa, label='Moving Average', color='red', linewidth=2)
 
         activity = name.split("_")[1].capitalize() + "ing"
         plt.title(f'X Acceleration with Moving Average for {personName} {activity}', fontsize=15)
@@ -198,7 +203,8 @@ with h5py.File('./hdf5_data.h5', 'w') as hdf:
         plt.grid(True, alpha=0.7)
         plt.tight_layout()
         plt.show()
-    
+
+        '''
         # Y plot
         plt.plot(df['Time (s)'], df['Acceleration y (m/s^2)'], label='Original Y Acceleration', color='blue')
         plt.plot(df['Time (s)'], yAccMa100, label='Moving Average', color='red', linewidth=2)
