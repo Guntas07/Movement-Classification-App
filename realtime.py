@@ -18,7 +18,7 @@ driver = webdriver.Chrome(options=options)
 def read_realtime_data():
     # This is the server that PhyPhox outputs the data to
     # driver.get("http://192.168.2.38/") # Address of my house
-    driver.get("http://10.216.24.230/") # Address at stauffer
+    driver.get("http://192.168.2.30/") # Address at stauffer
 
     # Wait up to 10 seconds for view selector to load
     wait = WebDriverWait(driver, 10)
