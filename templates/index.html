@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Movement Classifier</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  </head>
+  <body class="bg-slate-50 min-h-screen">
+    <nav class="bg-white/80 backdrop-blur border-b border-slate-200">
+      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <a href="/" class="text-slate-800 font-semibold">Movement Classifier</a>
+        <div class="space-x-4 text-sm">
+          <a class="text-slate-600 hover:text-slate-900" href="/">CSV</a>
+          <a class="text-slate-600 hover:text-slate-900" href="/realtime">Realtime</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-4 py-10">
+      <header class="mb-8">
+        <h1 class="text-2xl font-bold text-slate-900">CSV Classification</h1>
+        <p class="text-slate-600">Upload a motion CSV to classify each 5-second window as Walking or Jumping.</p>
+      </header>
+
+      <section class="grid md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <form id="uploadForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700">Motion CSV</label>
+              <input id="file" name="file" type="file" accept=".csv" class="mt-1 block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" required />
+            </div>
+            <button type="submit" class="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-500 disabled:opacity-50">Classify</button>
+          </form>
+
+          <div id="status" class="mt-4 text-sm text-slate-600"></div>
+
+          <div id="summary" class="mt-4 hidden">
+            <h3 class="text-sm font-semibold text-slate-800 mb-2">Summary</h3>
+            <div class="text-sm text-slate-700" id="counts"></div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <h3 class="text-sm font-semibold text-slate-800 mb-2">Predictions</h3>
+          <canvas id="predChart" height="140"></canvas>
+          <div class="text-xs text-slate-500 mt-2">0 = Walking, 1 = Jumping</div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const form = document.getElementById('uploadForm');
+      const statusEl = document.getElementById('status');
+      const countsEl = document.getElementById('counts');
+      const summaryEl = document.getElementById('summary');
+      const ctx = document.getElementById('predChart');
+      let chart;
+
+      function renderChart(values) {
+        const labels = values.map((_, i) => i + 1);
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Prediction',
+              data: values,
+              stepped: true,
+              borderColor: '#4f46e5',
+              backgroundColor: 'rgba(79,70,229,0.1)',
+              pointRadius: 0,
+            }],
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: { min: -0.1, max: 1.1, ticks: { stepSize: 1 } },
+              x: { title: { display: true, text: '5-sec window' } }
+            },
+            plugins: { legend: { display: false } }
+          }
+        });
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById('file');
+        if (!fileInput.files[0]) return;
+        statusEl.textContent = 'Uploading and classifying…';
+        summaryEl.classList.add('hidden');
+        const data = new FormData();
+        data.append('file', fileInput.files[0]);
+        try {
+          const res = await fetch('/api/predict/csv', { method: 'POST', body: data });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: res.statusText }));
+            throw new Error(err.detail || 'Classification failed');
+          }
+          const json = await res.json();
+          const preds = json.predictions || [];
+          const walk = preds.filter(p => p === 0).length;
+          const jump = preds.filter(p => p === 1).length;
+          countsEl.textContent = `${preds.length} windows · ${walk} walking · ${jump} jumping`;
+          summaryEl.classList.remove('hidden');
+          renderChart(preds);
+          statusEl.textContent = 'Done';
+        } catch (err) {
+          statusEl.textContent = err.message;
+        }
+      });
+    </script>
+  </body>
+  </html>
+
