@@ -1,4 +1,4 @@
-# ELEC292Final
+# Movement Classification App
 
 This project classifies user movement (Walking vs Jumping) using a Logistic Regression model trained on team‑collected sensor data. It supports both a desktop UI (Tkinter) and a modern web UI (FastAPI + Tailwind + Chart.js).
 
