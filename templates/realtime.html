@@ -3,111 +3,82 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Realtime · Movement Classifier</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Realtime Lab · Movement Classifier</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body class="bg-slate-50 min-h-screen">
-    <nav class="bg-white/80 backdrop-blur border-b border-slate-200">
-      <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <a href="/" class="text-slate-800 font-semibold">Movement Classifier</a>
-        <div class="space-x-4 text-sm">
-          <a class="text-slate-600 hover:text-slate-900" href="/">CSV</a>
-          <a class="text-slate-900 font-semibold" href="/realtime">Realtime</a>
+  <body>
+    <nav class="nav">
+      <div class="shell nav-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark">⌁</span>
+          <span>Movement Classifier</span>
+        </a>
+        <div class="nav-links" aria-label="Primary navigation">
+          <a class="nav-link" href="/">CSV Studio</a>
+          <a class="nav-link active" href="/realtime">Realtime Lab</a>
         </div>
       </div>
     </nav>
 
-    <main class="max-w-5xl mx-auto px-4 py-10">
-      <header class="mb-8">
-        <h1 class="text-2xl font-bold text-slate-900">Realtime Classification</h1>
-        <p class="text-slate-600">Polls every 5 seconds using your PhyPhox stream.</p>
-      </header>
-
-      <section class="grid md:grid-cols-2 gap-6">
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <div class="text-sm text-slate-600">Current prediction</div>
-          <div id="current" class="text-3xl font-bold mt-1">—</div>
-          <div id="status" class="mt-2 text-sm text-slate-500"></div>
-          <button id="toggle" class="mt-4 inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-white font-medium hover:bg-indigo-500">Start</button>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Live PhyPhox stream</p>
+          <h1>Watch movement predictions as they happen.</h1>
+          <p class="lede">
+            Connect your phone stream, start polling, and see each live classifier result roll into a polished dashboard with running history and totals.
+          </p>
         </div>
+        <aside class="hero-card">
+          <p class="card-title">Realtime setup</p>
+          <p class="card-copy">This page calls the existing `/api/predict/realtime` endpoint every 5 seconds. Update `realtime.py` with your local PhyPhox URL before starting.</p>
+          <div class="metric-grid">
+            <div class="metric"><strong>5s</strong><span>poll cadence</span></div>
+            <div class="metric"><strong>2</strong><span>classes</span></div>
+            <div class="metric"><strong>Live</strong><span>history chart</span></div>
+          </div>
+        </aside>
+      </section>
 
-        <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
-          <h3 class="text-sm font-semibold text-slate-800 mb-2">Predictions</h3>
-          <canvas id="predChart" height="140"></canvas>
-          <div class="text-xs text-slate-500 mt-2">0 = Walking, 1 = Jumping</div>
-        </div>
+      <section class="grid">
+        <article class="card">
+          <h2 class="card-title">Current prediction</h2>
+          <p class="card-copy">Start the stream when your PhyPhox web view is reachable from this machine.</p>
+
+          <div class="current-readout">
+            <div>
+              <div class="current-label" data-current-label>Ready</div>
+              <div class="current-state" data-current-state>Start the stream to classify live motion</div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button data-toggle>Start stream</button>
+            <button class="secondary-button" data-clear>Clear history</button>
+          </div>
+          <div class="status" data-status aria-live="polite">Idle</div>
+        </article>
+
+        <article class="card">
+          <h2 class="card-title">Live session dashboard</h2>
+          <p class="card-copy">Track the current run without refreshing the page.</p>
+
+          <div class="result-row">
+            <div class="stat"><span>Readings</span><strong data-history-count>0</strong></div>
+            <div class="stat"><span>Walking</span><strong data-walking-count>0</strong></div>
+            <div class="stat"><span>Jumping</span><strong data-jumping-count>0</strong></div>
+          </div>
+
+          <div class="chart-wrap">
+            <canvas id="predChart"></canvas>
+          </div>
+          <div class="prediction-list" data-recent-list></div>
+        </article>
       </section>
     </main>
 
-    <script>
-      const currentEl = document.getElementById('current');
-      const statusEl = document.getElementById('status');
-      const toggleEl = document.getElementById('toggle');
-      const ctx = document.getElementById('predChart');
-      let timer = null;
-      let values = [];
-      let chart;
-
-      function renderChart(data) {
-        const labels = data.map((_, i) => i + 1);
-        if (chart) chart.destroy();
-        chart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Prediction',
-              data,
-              stepped: true,
-              borderColor: '#4f46e5',
-              backgroundColor: 'rgba(79,70,229,0.1)',
-              pointRadius: 0,
-            }],
-          },
-          options: {
-            responsive: true,
-            scales: {
-              y: { min: -0.1, max: 1.1, ticks: { stepSize: 1 } },
-              x: { title: { display: true, text: '5-sec window' } }
-            },
-            plugins: { legend: { display: false } }
-          }
-        });
-      }
-
-      async function tick() {
-        try {
-          statusEl.textContent = 'Polling…';
-          const res = await fetch('/api/predict/realtime');
-          if (!res.ok) throw new Error('Realtime endpoint failed');
-          const json = await res.json();
-          const p = json.prediction;
-          currentEl.textContent = json.label || (p === 1 ? 'Jumping' : 'Walking');
-          values.push(p);
-          renderChart(values);
-          statusEl.textContent = 'Updated';
-        } catch (err) {
-          statusEl.textContent = err.message + '. Check PhyPhox stream address.';
-        }
-      }
-
-      toggleEl.addEventListener('click', () => {
-        if (timer) {
-          clearInterval(timer);
-          timer = null;
-          toggleEl.textContent = 'Start';
-          statusEl.textContent = 'Paused';
-          return;
-        }
-        values = [];
-        renderChart(values);
-        tick();
-        timer = setInterval(tick, 5000);
-        toggleEl.textContent = 'Pause';
-        statusEl.textContent = 'Running';
-      });
-    </script>
+    <script src="/static/realtime.js" defer></script>
   </body>
-  </html>
-
+</html>
