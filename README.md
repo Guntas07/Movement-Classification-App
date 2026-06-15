@@ -1,12 +1,22 @@
 # Movement Classification App
 
-This project classifies user movement (Walking vs Jumping) using a Logistic Regression model trained on team‑collected sensor data. It supports both a desktop UI (Tkinter) and a modern web UI (FastAPI + Tailwind + Chart.js).
+This project classifies user movement (Walking vs Jumping) using a Logistic Regression model trained on team-collected sensor data. It supports both a desktop UI (Tkinter) and a redesigned modern web UI (FastAPI + custom CSS + Chart.js).
 
 Model accuracy on >300k labeled samples: ~98%.
 
 ## Apps
 - Desktop UI: `app.py` (Tkinter, plots with Matplotlib)
-- Web UI: `server.py` (FastAPI, Tailwind via CDN, Chart.js for visualizations)
+- Web UI: `server.py` with:
+  - CSV Studio at `/` for drag-and-drop CSV classification
+  - Realtime Lab at `/realtime` for polling the PhyPhox stream
+
+## Frontend refresh
+The web experience now includes:
+- A dark glassmorphism design system in `static/styles.css`
+- A polished CSV upload workflow in `static/app.js`
+- A realtime polling dashboard in `static/realtime.js`
+- Chart.js visualizations for both uploaded and live predictions
+- Responsive layouts for desktop and mobile
 
 ## Quickstart (Web UI)
 1) Python deps (suggested):
